@@ -1,0 +1,33 @@
+# Build 240-MP for arm64 Linux (Batocera / Raspberry Pi)
+# Used locally: docker buildx build --platform linux/arm64 --output type=local,dest=./dist-arm64 -f Dockerfile.batocera .
+FROM --platform=linux/arm64 debian:trixie-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    qt6-base-dev \
+    qt6-declarative-dev \
+    libqt6svg6 \
+    qt6-svg-dev \
+    qml6-module-qtquick \
+    qml6-module-qtquick-controls \
+    qml6-module-qtquick-window \
+    libdrm-dev \
+    libssl-dev \
+    libsdl2-dev \
+    libpcsclite-dev \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN cmake -B build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/install/usr/local \
+    && cmake --build build --parallel $(nproc) \
+    && cmake --install build
+
+# Export only the binary
+FROM scratch
+COPY --from=0 /install /
