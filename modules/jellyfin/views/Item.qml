@@ -462,6 +462,26 @@ FocusScope {
                     font.pixelSize: root.sh * 0.0333333 //16
                 }
 
+                // Aspect ratio badge
+                Rectangle {
+                    visible: detail && detail.aspectRatioLabel && detail.aspectRatioLabel !== ""
+                    color: "transparent"
+                    border.color: root.accentColor
+                    border.width: root.sh * 0.004167 //2
+                    width: arText.implicitWidth + root.sw * 0.025 //16
+                    height: arText.implicitHeight + root.sh * 0.0125 //6
+                    radius: root.sh * 0.01
+
+                    Text {
+                        id: arText
+                        anchors.centerIn: parent
+                        text: detail ? (detail.aspectRatioLabel || "") : ""
+                        color: root.accentColor
+                        font.family: root.globalFont
+                        font.pixelSize: root.sh * 0.0291667 //14
+                    }
+                }
+
                 // Summary
                 Item {
                     id: summaryContainer

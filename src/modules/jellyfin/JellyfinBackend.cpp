@@ -15,6 +15,7 @@
 #include <QSysInfo>
 #include <QSet>
 #include <QRegularExpression>
+#include <cmath>
 
 static const QString kModuleId = QStringLiteral("com.240mp.jellyfin");
 
@@ -25,6 +26,27 @@ static const QSet<QString> kSupportedCollectionTypes = {
     QStringLiteral("movies"), QStringLiteral("tvshows"), QStringLiteral("homevideos"),
     QStringLiteral("boxsets")
 };
+
+static QString aspectRatioLabel(int w, int h) {
+    if (w <= 0 || h <= 0) return {};
+    double r = static_cast<double>(w) / h;
+    struct { double ratio; const char *label; } kRatios[] = {
+        { 4.0/3,   "4:3"    },
+        { 16.0/9,  "16:9"   },
+        { 16.0/10, "16:10"  },
+        { 1.85,    "1.85:1" },
+        { 2.35,    "2.35:1" },
+        { 2.39,    "2.39:1" },
+        { 21.0/9,  "21:9"   },
+    };
+    for (const auto &k : kRatios) {
+        if (std::abs(r - k.ratio) < 0.04)
+            return QLatin1String(k.label);
+    }
+    auto gcd = [](int a, int b) -> int { while (b) { int t = b; b = a % b; a = t; } return a; };
+    int g = gcd(w, h);
+    return QStringLiteral("%1:%2").arg(w / g).arg(h / g);
+}
 
 static QString authHeaderValue(const QString &token, const QString &deviceId) {
     QString auth = QStringLiteral("MediaBrowser Client=\"240-MP\", Device=\"%1\", DeviceId=\"%2\", Version=\"%3\"")
@@ -496,10 +518,14 @@ QVariantMap JellyfinBackend::formatItem(const QJsonObject &item) const {
 
     QVariantList audioStreams;
     QVariantList subtitleStreams;
+    int videoW = 0, videoH = 0;
     for (const QJsonValue &v : streams) {
         QJsonObject s = v.toObject();
         QString type = s["Type"].toString();
-        if (type == QLatin1String("Audio")) {
+        if (type == QLatin1String("Video")) {
+            videoW = s["Width"].toInt();
+            videoH = s["Height"].toInt();
+        } else if (type == QLatin1String("Audio")) {
             QVariantMap as;
             as["id"]          = QString::number(s["Index"].toInt());
             as["language"]    = s["Language"].toString();
@@ -572,6 +598,7 @@ QVariantMap JellyfinBackend::formatItem(const QJsonObject &item) const {
     map["mediaSourceId"]   = mediaSource["Id"].toString();
     map["audioStreams"]    = audioStreams;
     map["subtitleStreams"]= subtitleStreams;
+    map["aspectRatioLabel"] = aspectRatioLabel(videoW, videoH);
     return map;
 }
 

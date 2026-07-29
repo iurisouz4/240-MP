@@ -14,6 +14,7 @@
 #include <QVariantMap>
 #include <QDebug>
 #include <QDateTime>
+#include <cmath>
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -22,6 +23,28 @@
 static const QString PLEX_TV = QStringLiteral("https://plex.tv");
 
 static const QSet<QString> kSupportedLibraryTypes = {"movie", "show", "clip"};
+
+static QString aspectRatioLabel(int w, int h) {
+    if (w <= 0 || h <= 0) return {};
+    double r = static_cast<double>(w) / h;
+    struct { double ratio; const char *label; } kRatios[] = {
+        { 4.0/3,   "4:3"    },
+        { 16.0/9,  "16:9"   },
+        { 16.0/10, "16:10"  },
+        { 1.85,    "1.85:1" },
+        { 2.35,    "2.35:1" },
+        { 2.39,    "2.39:1" },
+        { 21.0/9,  "21:9"   },
+    };
+    for (const auto &k : kRatios) {
+        if (std::abs(r - k.ratio) < 0.04)
+            return QLatin1String(k.label);
+    }
+    // Simplified ratio via GCD
+    auto gcd = [](int a, int b) -> int { while (b) { int t = b; b = a % b; a = t; } return a; };
+    int g = gcd(w, h);
+    return QStringLiteral("%1:%2").arg(w / g).arg(h / g);
+}
 
 #ifdef Q_OS_MAC
 static const QString kPlexPlatform = QStringLiteral("macOS");
@@ -1649,6 +1672,8 @@ QVariantMap PlexBackend::buildItemDetail(const QJsonObject &meta) const {
              << "| quality:" << videoQuality()
              << "| playback:" << (forceTranscode ? "transcode" : "direct play");
     int duration = meta["duration"].toInt();
+    int videoW = media["width"].toInt();
+    int videoH = media["height"].toInt();
 
     return QVariantMap{
         {"ratingKey",        meta["ratingKey"].toString()},
@@ -1672,6 +1697,7 @@ QVariantMap PlexBackend::buildItemDetail(const QJsonObject &meta) const {
         {"parentRatingKey",  meta["parentRatingKey"].toString()},
         {"grandparentTitle", meta["grandparentTitle"].toString()},
         {"parentTitle",      meta["parentTitle"].toString()},
+        {"aspectRatioLabel", aspectRatioLabel(videoW, videoH)},
     };
 }
 
